@@ -42,4 +42,3 @@ Enjoy using this tool to prepare your audio files for Audible/ACX!
 
 For more information about Audible/ACX requirements, visit [ACX Audio Submission Requirements](https://www.acx.com/help/acx-audio-submission-requirements/201456300).
 
-For more information about Block Transfer, visit [Block Transfer](www.blocktransfer.com).
