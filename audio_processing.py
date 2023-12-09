@@ -5,7 +5,7 @@ import os
 
 def limiter(audio_segment, threshold=-3.0):
   normalized_audio = normalize(audio_segment)
-  limited_audio = normalized_audio.apply_gain(gain_reduction)
+  limited_audio = normalized_audio.apply_gain(threshold)
 
   threshold_amplitude = 10 ** (threshold / 20.0) * limited_audio.max_possible_amplitude
   audio_data = np.array(limited_audio.get_array_of_samples())
