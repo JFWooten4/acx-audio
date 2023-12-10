@@ -28,11 +28,7 @@ Before using this tool, make sure you have the following prerequisites installed
 
 The script will process each .mp3 file in the `raw` directory, apply dynamic range compression, normalization, limiting, and adjust the RMS level to the specified target.
 
-5. The processed audio files will be saved in the same `raw` directory with filenames prefixed by "__". For example, if you had a file named `example.mp3`, the processed file would be named `__example.mp3`.
-
-6. Ensure that the processed audio files meet Audible/ACX requirements, including the sample rate (44.1 kHz), bit depth (16-bit), and mono channel.
-
-7. Upload the processed audio files to Audible/ACX following their submission guidelines.
+5. The processed audio files will be saved in the `processed` directory with the same file names.
 
 ## Notes
 
