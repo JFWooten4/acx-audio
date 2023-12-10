@@ -6,16 +6,19 @@ import os
 
 # Modify config here
 INPUT_DIR = "raw"
-TARGET_RMS_Db = -18
+TARGET_RMS_dB = -18
+THRESHOLD_dB = -3.0
 
 PROCESSED_DIR = "processed"
 CHUNK_LEN_MS = 560000
 
-def limitAudio(audioSeg, threshold=-3.0):
-  threshold_amplitude = 10 ** (threshold / 20.0) * audioSeg.max_possible_amplitude
+def limitAudio(audioSeg): # not working entirely for me
+  normalized_audio = normalize(audioSeg)
+  audioSeg = normalized_audio.apply_gain(THRESHOLD_dB)
+  maxAmplitude = 10 ** (THRESHOLD_dB / 20.0) * audioSeg.max_possible_amplitude
   data = np.array(audioSeg.get_array_of_samples())
-  data = np.where(data > threshold_amplitude, threshold_amplitude, data)
-  data = np.where(data < -threshold_amplitude, -threshold_amplitude, data)
+  data = np.where(data > maxAmplitude, maxAmplitude, data)
+  data = np.where(data < -maxAmplitude, -maxAmplitude, data)
   match audioSeg.sample_width:
     case 2:
       data = data.astype(np.int16)
@@ -28,21 +31,21 @@ def calcRMS(audioSeg):
   rms = np.sqrt(np.mean(np.square(samples)))
   if rms == 0:
     return -np.inf
-  RMS_Db = 20 * np.log10(rms / audioSeg.max_possible_amplitude)
-  return RMS_Db
+  RMS_dB = 20 * np.log10(rms / audioSeg.max_possible_amplitude)
+  return RMS_dB
 
-def fixRMS(audioSeg, TARGET_RMS_Db):
-  current_RMS_Db = calcRMS(audioSeg)
-  required_gain_db = TARGET_RMS_Db - current_RMS_Db
-  return audioSeg.apply_gain(required_gain_db)
+def fixRMS(audioSeg, TARGET_RMS_dB):
+  RMSnow = calcRMS(audioSeg)
+  gainReq = TARGET_RMS_dB - RMSnow
+  return audioSeg.apply_gain(gainReq)
 
 def fixChunk(audioSeg):
   mono = audioSeg.set_channels(1)
   mono44k = mono.set_frame_rate(44100)
   compressed = compress_dynamic_range(mono44k, threshold=-20.0, ratio=2.0)
   normalized = normalize(compressed)
-  limited = limitAudio(normalized, -3)
-  adjusted = fixRMS(limited, TARGET_RMS_Db)
+  limited = limitAudio(normalized)
+  adjusted = fixRMS(limited, TARGET_RMS_dB)
   # Any extra processing here
   return adjusted
 
