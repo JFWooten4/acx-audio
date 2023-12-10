@@ -2,6 +2,10 @@
 
 This Python script allows you to process a folder of raw audio files (in the .mp3 format) to meet Audible/ACX requirements. It applies dynamic range compression, normalization, limiting, and adjusts the RMS level to a target value using the PyDub library.
 
+Audiobooks should be recorded in 16 bit / 44.1 kHz wav file format, which is considered CD quality and is best for archiving. When you are ready to upload your files, they must be saved as a 192kbps mp3.
+
+This code formats your final recordings in mono rather than stereo for a uniform listener experience.
+
 ## Prerequisites
 
 Before using this tool, make sure you have the following prerequisites installed:
