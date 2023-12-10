@@ -1,5 +1,6 @@
 from pydub import AudioSegment
-from pydub.effects import normalize
+from pydub.effects import normalize, compress_dynamic_range
+from pydub.utils import make_chunks
 import numpy as np
 import os
 
@@ -30,24 +31,28 @@ def adjust_rms_level(audio_segment, target_rms_db):
   required_gain_db = target_rms_db - current_rms_db
   return audio_segment.apply_gain(required_gain_db)
 
-from pydub.effects import compress_dynamic_range
+def process_chunk(chunk):
+  chunk_mono = chunk.set_channels(1)
+  chunk_mono_44100 = chunk_mono.set_frame_rate(44100)
+  compressed_chunk = compress_dynamic_range(chunk_mono_44100, threshold=-20.0, ratio=2.0)
+  normalized_chunk = normalize(compressed_chunk)
+  limited_chunk = limiter(normalized_chunk, -3)
+  adjusted_chunk = adjust_rms_level(limited_chunk, target_rms_db)
+  return adjusted_chunk
 
 # Modify here
 directory = "raw"
 target_rms_db = -18
+chunk_length_ms = 560000
 
 for filename in os.listdir(directory):
   if filename.endswith(".mp3"):
     file_path = os.path.join(directory, filename)
-    
     audio = AudioSegment.from_mp3(file_path)
-    audio_mono = audio.set_channels(1)
-    audio_mono_44100 = audio_mono.set_frame_rate(44100)
 
-    compressed_audio = compress_dynamic_range(audio_mono_44100, threshold=-20.0, ratio=2.0)
-    normalized_audio = normalize(compressed_audio)
-    limited_audio = limiter(normalized_audio, -3)
-    adjusted_audio = adjust_rms_level(limited_audio, target_rms_db)
+    chunks = make_chunks(audio, chunk_length_ms)
+    processed_chunks = [process_chunk(chunk) for chunk in chunks]
+    combined_audio = sum(processed_chunks, AudioSegment.silent(duration=0))
 
     formatted_filename = f"__{filename}"
-    adjusted_audio.export(os.path.join(directory, formatted_filename), format="mp3", bitrate="192k")
+    combined_audio.export(os.path.join(directory, formatted_filename), format="mp3", bitrate="192k")
