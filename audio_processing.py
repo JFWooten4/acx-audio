@@ -4,55 +4,57 @@ from pydub.utils import make_chunks
 import numpy as np
 import os
 
-def limiter(audio_segment, threshold=-3.0):
-  normalized_audio = normalize(audio_segment)
-  limited_audio = normalized_audio.apply_gain(threshold)
+# Modify config here
+INPUT_DIR = "raw"
+TARGET_RMS_Db = -18
 
-  threshold_amplitude = 10 ** (threshold / 20.0) * limited_audio.max_possible_amplitude
-  audio_data = np.array(limited_audio.get_array_of_samples())
-  audio_data = np.where(audio_data > threshold_amplitude, threshold_amplitude, audio_data)
-  audio_data = np.where(audio_data < -threshold_amplitude, -threshold_amplitude, audio_data)
+PROCESSED_DIR = "processed"
+CHUNK_LEN_MS = 560000
 
-  if limited_audio.sample_width == 2:
-    audio_data = audio_data.astype(np.int16)
-  elif limited_audio.sample_width == 4:
-    audio_data = audio_data.astype(np.int32)
+def limitAudio(audioSeg, threshold=-3.0):
+  threshold_amplitude = 10 ** (threshold / 20.0) * audioSeg.max_possible_amplitude
+  data = np.array(audioSeg.get_array_of_samples())
+  data = np.where(data > threshold_amplitude, threshold_amplitude, data)
+  data = np.where(data < -threshold_amplitude, -threshold_amplitude, data)
+  match audioSeg.sample_width:
+    case 2:
+      data = data.astype(np.int16)
+    case 4:
+      data = data.astype(np.int32)
+  return audioSeg._spawn(data.tobytes())
 
-  return limited_audio._spawn(audio_data.tobytes())
-
-def calculate_rms(audio_segment):
-  samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float64)
+def calcRMS(audioSeg):
+  samples = np.array(audioSeg.get_array_of_samples(), dtype=np.float64)
   rms = np.sqrt(np.mean(np.square(samples)))
-  rms_db = 20 * np.log10(rms / audio_segment.max_possible_amplitude)
-  return rms_db
+  if rms == 0:
+    return -np.inf
+  RMS_Db = 20 * np.log10(rms / audioSeg.max_possible_amplitude)
+  return RMS_Db
 
-def adjust_rms_level(audio_segment, target_rms_db):
-  current_rms_db = calculate_rms(audio_segment)
-  required_gain_db = target_rms_db - current_rms_db
-  return audio_segment.apply_gain(required_gain_db)
+def fixRMS(audioSeg, TARGET_RMS_Db):
+  current_RMS_Db = calcRMS(audioSeg)
+  required_gain_db = TARGET_RMS_Db - current_RMS_Db
+  return audioSeg.apply_gain(required_gain_db)
 
-def process_chunk(chunk):
-  chunk_mono = chunk.set_channels(1)
-  chunk_mono_44100 = chunk_mono.set_frame_rate(44100)
-  compressed_chunk = compress_dynamic_range(chunk_mono_44100, threshold=-20.0, ratio=2.0)
-  normalized_chunk = normalize(compressed_chunk)
-  limited_chunk = limiter(normalized_chunk, -3)
-  adjusted_chunk = adjust_rms_level(limited_chunk, target_rms_db)
-  return adjusted_chunk
+def fixChunk(audioSeg):
+  mono = audioSeg.set_channels(1)
+  mono44k = mono.set_frame_rate(44100)
+  compressed = compress_dynamic_range(mono44k, threshold=-20.0, ratio=2.0)
+  normalized = normalize(compressed)
+  limited = limitAudio(normalized, -3)
+  adjusted = fixRMS(limited, TARGET_RMS_Db)
+  # Any extra processing here
+  return adjusted
 
-# Modify here
-directory = "raw"
-target_rms_db = -18
-chunk_length_ms = 560000
+if not os.path.exists(PROCESSED_DIR):
+  os.makedirs(PROCESSED_DIR)
 
-for filename in os.listdir(directory):
+for filename in os.listdir(INPUT_DIR):
   if filename.endswith(".mp3"):
-    file_path = os.path.join(directory, filename)
-    audio = AudioSegment.from_mp3(file_path)
-
-    chunks = make_chunks(audio, chunk_length_ms)
-    processed_chunks = [process_chunk(chunk) for chunk in chunks]
-    combined_audio = sum(processed_chunks, AudioSegment.silent(duration=0))
-
-    formatted_filename = f"__{filename}"
-    combined_audio.export(os.path.join(directory, formatted_filename), format="mp3", bitrate="192k")
+    path = os.path.join(INPUT_DIR, filename)
+    audio = AudioSegment.from_mp3(path)
+    chunks = make_chunks(audio, CHUNK_LEN_MS)
+    processedChunks = [fixChunk(chunk) for chunk in chunks]
+    combinedChunks = sum(processedChunks, AudioSegment.silent(duration=0))
+    combinedChunks.export(os.path.join(PROCESSED_DIR, filename), format="mp3", bitrate="192k")
+# add .wav case here or just sub in above
